@@ -9,8 +9,13 @@ export interface BaseMongoFields {
 }
 
 export interface IUser {
-  readonly _id: ObjectId;
-  [key: string]: any;
+  _id: ObjectId;
+  username: string;
+  email?: string;
+  socketId?: string;        // Current active socket (optional, changes on reconnect)
+  uniqueCode: string;       // Your 6-digit friend code
+  isOnline: boolean;
+  lastSeen: Date;
 }
 
 export interface AccessTokenPayload {

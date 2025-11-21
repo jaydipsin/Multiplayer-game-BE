@@ -1,6 +1,6 @@
 import { ObjectId } from "mongoose";
 import userModel from "../models/user.model";
-import { IUser } from "../app.interface";
+import { IUser } from "../interfaces/app.interface";
 import { Types } from "mongoose";
 
 export const getUserById = async (
