@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
 import { JWT_ACCESS_TOKEN_SECRET, JWT_SECRET } from "../config/global.config";
-import { RefreshTokenPayload } from "../app.interface";
+import { RefreshTokenPayload } from "../interfaces/app.interface";
 import { Types } from "mongoose";
 import { getUserById } from "../utils/users.utils";
 

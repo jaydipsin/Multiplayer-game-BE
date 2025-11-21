@@ -1,4 +1,4 @@
-import { BaseMongoFields, IUser } from "../../app.interface";
+import { BaseMongoFields, IUser } from "./app.interface";
 
 export interface SignupResponse {
   accessToken: string;
