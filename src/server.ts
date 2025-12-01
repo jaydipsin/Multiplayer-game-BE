@@ -11,7 +11,7 @@ dotenv.config();
 const PORT = process.env.PORT || 5000;
 app.use(
   cors({
-    origin: "http://localhost:4200", // frontend origin
+    origin: process.env.FE_STAGING_URL, // frontend origin
     credentials: true,
   })
 );
@@ -29,7 +29,7 @@ connectDB().then(() => {
   const httpServer = http.createServer(app);
   const io = new Server(httpServer, {
     cors: {
-      origin: "http://localhost:4200",
+      origin: process.env.BE_STAGING_URL,
       methods: ["GET", "POST"],
     },
   });
