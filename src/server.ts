@@ -18,13 +18,20 @@ app.use(
 );
 
 // ✅ Add your CSP middleware here, before routes
+app.use(cors);
 app.use((req, res, next) => {
-  res.setHeader(
-    "Content-Security-Policy",
-    // Add your deployed BE URL here as well
-    "default-src 'self'; connect-src 'self' http://localhost:8000 " +
-      process.env.BE_STAGING_URL
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, X-Requested-With"
   );
+  // res.setHeader(
+  //   "Content-Security-Policy",
+  //   "default-src 'self'; connect-src 'self' http://localhost:8000 " +
+  //     process.env.BE_STAGING_URL
+  // );
   next();
 });
 app.use(express.json());
