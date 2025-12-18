@@ -11,8 +11,8 @@ dotenv.config();
 const PORT = process.env.PORT || 5000;
 app.use(
   cors({
-    // origin: process.env.FE_STAGING_URL, // frontend origin
-    origin: "http://localhost:4200",
+    origin: process.env.FE_STAGING_URL, // frontend origin
+    // origin: "http://localhost:4200",
     credentials: true,
   })
 );
