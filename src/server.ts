@@ -21,7 +21,9 @@ app.use(
 app.use((req, res, next) => {
   res.setHeader(
     "Content-Security-Policy",
-    "default-src 'self'; connect-src 'self' http://localhost:8000"
+    // Add your deployed BE URL here as well
+    "default-src 'self'; connect-src 'self' http://localhost:8000 " +
+      process.env.BE_STAGING_URL
   );
   next();
 });
