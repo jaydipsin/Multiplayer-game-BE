@@ -9,11 +9,6 @@ dotenv.config();
 
 const app = express();
 
-const corsOptions = {
-  origin: "https://multiplayer-game-be-t5pn.onrender.com",
-  credentials: true,
-};
-app.use(cors(corsOptions));
 app.use(express.json());
 app.use(cookieParser());
 app.use("", authRoutes);
