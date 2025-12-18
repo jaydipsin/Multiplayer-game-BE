@@ -18,22 +18,19 @@ app.use(
 );
 
 // ✅ Add your CSP middleware here, before routes
-app.use(cors);
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE");
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With"
-  );
-  // res.setHeader(
-  //   "Content-Security-Policy",
-  //   "default-src 'self'; connect-src 'self' http://localhost:8000 " +
-  //     process.env.BE_STAGING_URL
-  // );
-  next();
-});
+const allowedOrigins = [
+  "http://localhost:4200",
+  process.env.FE_STAGING_URL || "",
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  })
+);
+
 app.use(express.json());
 connectDB().then(() => {
   const httpServer = http.createServer(app);
