@@ -104,22 +104,27 @@ export class SocketHandler {
   }
 
   private registerGameEvents(socket: Socket) {
-    socket.on("send-invite", (data: { toCode: string }) => {
-      console.log("eeeee Data ", data);
-      return this.handleSendInvite(socket, data.toCode);
-    });
-    socket.on("accept-invite", (data: { fromSocketId: string }) =>
+    socket.on("send-invite", (data) =>
+      this.handleSendInvite(socket, data.toCode)
+    );
+    socket.on("accept-invite", (data) =>
       this.handleAcceptInvite(socket, data.fromSocketId)
     );
-    socket.on("reject-invite", (data: { fromSocketId: string }) =>
+    socket.on("reject-invite", (data) =>
       this.handleRejectInvite(socket, data.fromSocketId)
     );
-    socket.on("make-move", (data: { roomId: string; index: number }) =>
-      this.handleMakeMove(socket, data)
+    socket.on("make-move", (data) => this.handleMakeMove(socket, data));
+
+    // --- NEW EVENTS ---
+    socket.on("restart-game", (data: { roomId: string }) => {
+      console.log("RESTART TRIGGERED for room:", data.roomId);
+      this.handleRestartGame(socket, data.roomId);
+    });
+
+    socket.on("exit-game", (data: { roomId: string }) =>
+      this.handleExitGame(socket, data.roomId)
     );
-    socket.on("restart-game",()=>{
-      console.log("This all are the active gammes : ",this.activeGames);
-    })
+
     socket.on("disconnect", () => this.handleDisconnect(socket));
   }
 
@@ -182,17 +187,34 @@ export class SocketHandler {
     // Join both to room
     socket.join(roomId);
     this.io.sockets.sockets.get(fromSocketId)?.join(roomId);
-
     const gameState = {
       roomId,
       board: Array(9).fill(null),
       currentTurn: "X" as "X" | "O",
       playerX,
       playerO,
+      scores: { X: 0, O: 0 }, // PERSISTENT SCORE
     };
 
     this.activeGames.set(roomId, gameState);
 
+    // Update your individual emits to include scores
+    const gameData = {
+      roomId,
+      board: gameState.board,
+      currentTurn: "X",
+      players: {
+        /* ... your existing player object ... */
+      },
+      scores: gameState.scores, // Pass scores to FE
+    };
+
+    this.io
+      .to(fromSocketId)
+      .emit("game-start", { ...gameData, yourSymbol: "X", opponent: playerO });
+    this.io
+      .to(socket.id)
+      .emit("game-start", { ...gameData, yourSymbol: "O", opponent: playerX });
     // Emit to BOTH players with correct yourSymbol
     this.io.to(roomId).emit("game-start", {
       roomId,
@@ -272,99 +294,145 @@ export class SocketHandler {
     socket: Socket,
     { roomId, index }: { roomId: string; index: number }
   ) {
-    console.log(
-      `[MOVE ATTEMPT] Room: ${roomId}, Index: ${index}, Socket: ${socket.id}`
-    );
-
     const game = this.activeGames.get(roomId);
+    if (!game) return;
 
-    // 1. Check if game exists
-    if (!game) {
-      console.log("❌ Move Failed: Game room not found");
-      return;
-    }
+    // ... (Existing validation logic: cell empty, correct player, correct turn) ...
+    // [Copy your existing validation logic here for brevity, it was correct]
 
-    // 2. Check if cell is empty
-    if (game.board[index] !== null) {
-      console.log("❌ Move Failed: Cell already occupied");
-      return;
-    }
-
-    // 3. IDENTIFY PLAYER (Crucial Fix)
-    // We use the User ID from the onlineUsers map, because socket.id might have changed,
-    // but the mapping in this.onlineUsers is kept up to date in handleConnection/Disconnect.
+    // --- Validation logic snippet for context ---
+    if (game.board[index] !== null) return;
     const currentUser = this.onlineUsers.get(socket.id);
-
-    if (!currentUser) {
-      console.log("❌ Move Failed: User not found in online map");
-      return;
-    }
-
-    // Compare IDs, not Sockets
-    let symbol: "X" | "O" | null = null;
-
-    if (currentUser.userId === game.playerX.userId) {
-      symbol = "X";
-    } else if (currentUser.userId === game.playerO.userId) {
-      symbol = "O";
-    }
-
-    if (!symbol) {
-      console.log("❌ Move Failed: Socket does not belong to this game");
-      return;
-    }
-
-    // 4. Check Turn
-    if (game.currentTurn !== symbol) {
-      console.log(
-        `❌ Move Failed: It is ${game.currentTurn}'s turn, but ${symbol} tried to move.`
-      );
-      return;
-    }
-
-    // --- SUCCESS ---
-    console.log(`✅ Move Accepted: ${symbol} placed at ${index}`);
+    if (!currentUser) return;
+    let symbol =
+      currentUser.userId === game.playerX.userId
+        ? "X"
+        : currentUser.userId === game.playerO.userId
+          ? "O"
+          : null;
+    if (!symbol || game.currentTurn !== symbol) return;
+    // ---------------------------------------------
 
     game.board[index] = symbol;
     game.currentTurn = symbol === "X" ? "O" : "X";
 
-    // Broadcast the move to EVERYONE in the room (including the sender!)
+    // Check Winner
+    const winner = this.checkWinner(game.board);
+    const isDraw = !winner && game.board.every((cell: any) => cell !== null);
+
+    if (winner) {
+      game.scores[winner]++; // Increment X or O
+    }
     this.io.to(roomId).emit("opponent-move", {
       index,
       symbol,
-      board: game.board,
       nextTurn: game.currentTurn,
     });
-
-    // Check Winner Logic...
-    const winner = this.checkWinner(game.board);
-    if (winner || game.board.every((cell: any) => cell !== null)) {
+    if (winner || isDraw) {
       this.io.to(roomId).emit("game-over", {
-        winner: winner || null, // null means draw
-        draw: !winner, // explicit draw flag
+        winner: winner || null,
+        draw: isDraw,
         board: game.board,
+        scores: game.scores, // Send current match scores
       });
-      this.activeGames.delete(roomId);
+      // DO NOT DELETE game here
     }
   }
+  // private handleDisconnect(socket: Socket) {
+  //   const user = this.onlineUsers.get(socket.id);
+  //   if (user) {
+  //     User.updateOne(
+  //       { _id: user.userId },
+  //       { socketId: null, isOnline: false, lastSeen: new Date() }
+  //     ).catch(console.error);
+
+  //     this.onlineUsers.delete(socket.id);
+  //     const currentSocketIdInMap = this.userIdToSocket.get(user.userId);
+  //     if (currentSocketIdInMap === socket.id) {
+  //       this.userIdToSocket.delete(user.userId);
+  //     } else {
+  //       console.log(
+  //         `[Prevented Wipe] User ${user.username} reconnected, keeping new socket active.`
+  //       );
+  //     }
+  //     console.log(`${user.username} disconnected`);
+  //   }
+  // }
+
+  private handleRestartGame(socket: Socket, roomId: string) {
+    const game = this.activeGames.get(roomId);
+
+    if (!game) {
+      console.error(`Restart failed: Room ${roomId} not found`);
+      return;
+    }
+
+    // Reset logic
+    game.board = Array(9).fill(null);
+    game.currentTurn = "X";
+
+    console.log(
+      `Room ${roomId} board has been reset. Emitting game-restarted...`
+    );
+
+    // BROADCAST to the entire room so both players see the reset
+    this.io.to(roomId).emit("game-restarted", {
+      board: game.board,
+      currentTurn: "X",
+      scores: game.scores, // Crucial: send existing scores back
+    });
+  }
+
+  // --- NEW: Handle Exit (Destroy Room) ---
+private handleExitGame(socket: Socket, roomId: string) {
+  console.log(`Exit requested by ${socket.id} for room ${roomId}`);
+  this.cleanupGame(roomId, "The match has been ended.");
+} 
+  // --- UPDATED: Handle Disconnect (Cleanup stuck games) ---
   private handleDisconnect(socket: Socket) {
+    // 1. Database cleanup (Your existing code)
     const user = this.onlineUsers.get(socket.id);
     if (user) {
       User.updateOne(
         { _id: user.userId },
         { socketId: null, isOnline: false, lastSeen: new Date() }
       ).catch(console.error);
-
       this.onlineUsers.delete(socket.id);
-      const currentSocketIdInMap = this.userIdToSocket.get(user.userId);
-      if (currentSocketIdInMap === socket.id) {
-        this.userIdToSocket.delete(user.userId);
-      } else {
-        console.log(
-          `[Prevented Wipe] User ${user.username} reconnected, keeping new socket active.`
-        );
-      }
+      this.userIdToSocket.delete(user.userId);
       console.log(`${user.username} disconnected`);
+
+      // 2. NEW: Check if this user was in an active game and destroy it
+      // Since we don't map socket->room directly, we iterate (fine for now)
+      for (const [roomId, game] of this.activeGames.entries()) {
+        if (
+          game.playerX.userId === user.userId ||
+          game.playerO.userId === user.userId
+        ) {
+          this.cleanupGame(roomId, "Opponent disconnected");
+          break;
+        }
+      }
+    }
+  }
+
+  // --- Helper to destroy game ---
+  private cleanupGame(roomId: string, reason: string) {
+    if (this.activeGames.has(roomId)) {
+      // 1. FIRST: Notify both players so they can clear their signals/UI
+      // We use a general 'game-over' or a new 'game-closed' event
+      this.io.to(roomId).emit("game-closed", {
+        message: reason,
+        resetScores: true,
+      });
+
+      // 2. SECOND: Delete the data from the server memory
+      this.activeGames.delete(roomId);
+
+      // 3. FINALLY: Force the sockets out of the room
+      // This happens after the message is sent
+      this.io.in(roomId).socketsLeave(roomId);
+
+      console.log(`Room ${roomId} has been fully cleaned up.`);
     }
   }
 
