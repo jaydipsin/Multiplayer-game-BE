@@ -9,34 +9,32 @@ import { SocketHandler } from "./sockets/index"; // ← HERE!
 dotenv.config();
 
 const PORT = process.env.PORT || 5000;
-app.use(
-  cors({
-    origin: process.env.FE_STAGING_URL, // frontend origin
-    // origin: "http://localhost:4200",
-    credentials: true,
-  })
-);
 
 // ✅ Add your CSP middleware here, before routes
 const allowedOrigins = [
   "http://localhost:4200",
   process.env.FE_STAGING_URL || "",
 ].filter(Boolean);
-
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    optionsSuccessStatus: 200,
   })
 );
-
 app.use(express.json());
 connectDB().then(() => {
   const httpServer = http.createServer(app);
   const io = new Server(httpServer, {
     cors: {
-      origin: ["http://localhost:4200", process.env.BE_STAGING_URL || ""], // Allow local and staging
+      origin: allowedOrigins, // Allow local and staging
       methods: ["GET", "POST"],
       credentials: true,
     },
