@@ -19,6 +19,7 @@ const PORT = process.env.PORT || 5000;
 // 1. Define allowed origins
 const allowedOrigins = [
   "http://localhost:4200",
+  "https://multiplayer-game-tawny.vercel.app",
   process.env.FE_STAGING_URL,
 ].filter(Boolean) as string[];
 
