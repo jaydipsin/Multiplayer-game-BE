@@ -29,6 +29,20 @@ app.use(
     optionsSuccessStatus: 200,
   })
 );
+
+app.use((res, req, next) => {
+  req.setHeader("Access-Control-Allow-Origin", "*");
+  req.setHeader(
+    "Access-Control-Allow-Methods",
+    "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+  );
+  req.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, Accept"
+  );
+  req.setHeader("Access-Control-Allow-Credentials", "true");
+});
+
 app.use(express.json());
 connectDB().then(() => {
   const httpServer = http.createServer(app);
